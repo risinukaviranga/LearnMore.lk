@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum OrderStatus {
+  PAID
+  REFUNDED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now())
+
+  classes     ClassSession[]
+  enrollments Enrollment[]
+  papers      Paper[]
+  ebooks      EBook[]
+  cartItems   CartItem[]
+  orders      Order[]
+}
+
+model ClassSession {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  subject     String
+  grade       Int
+  startsAt    DateTime
+  durationMin Int
+  meetingUrl  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  instructorId String
+  instructor   User         @relation(fields: [instructorId], references: [id])
+  enrollments  Enrollment[]
+
+  @@index([startsAt])
+  @@index([subject, grade])
+}
+
+model Enrollment {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  attended   Boolean   @default(false)
+  attendedAt DateTime?
+
+  userId  String
+  classId String
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class   ClassSession @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId])
+}
+
+model Paper {
+  id                String   @id @default(cuid())
+  title             String
+  subject           String
+  grade             Int
+  year              Int
+  term              Int
+  isPremium         Boolean  @default(false)
+  fileUrl           String
+  markingSchemeUrl  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  uploaderId String
+  uploader   User   @relation(fields: [uploaderId], references: [id])
+
+  @@index([subject, grade, year, term])
+}
+
+model EBook {
+  id          String   @id @default(cuid())
+  title       String
+  author      String
+  description String
+  subject     String
+  price       Int
+  fileUrl     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById String
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+
+  @@index([subject])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId  String
+  ebookId String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ebook   EBook @relation(fields: [ebookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ebookId])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  total     Int
+  method    String
+  status    OrderStatus @default(PAID)
+  createdAt DateTime    @default(now())
+
+  userId String
+  user   User        @relation(fields: [userId], references: [id])
+  items  OrderItem[]
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id    String @id @default(cuid())
+  price Int
+
+  orderId String
+  ebookId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ebook   EBook @relation(fields: [ebookId], references: [id])
+
+  @@unique([orderId, ebookId])
+}
